@@ -1,26 +1,158 @@
-import { Template } from "aws-cdk-lib/assertions"
+import { Match, Template } from "aws-cdk-lib/assertions"
 import { App } from "aws-cdk-lib/core"
-import { ReactSpaStack } from "../src/ReactSpaStack"
+import { ReactSpaStack, SourceS3Resource } from "../src/ReactSpaStack"
 
-test("S3 Bucket Created", () => {
+const VALID_DOMAIN = "test.ruchij.com"
+const VALID_SOURCE: SourceS3Resource = {
+  bucketName: "artifact-bucket",
+  zipObjectKey: "main/abc1234/client.zip"
+}
+const STACK_ENV = { env: { account: "123456789012", region: "us-east-1" } }
+
+const buildStack = (
+  domain: string = VALID_DOMAIN,
+  source: SourceS3Resource = VALID_SOURCE
+): Template => {
   const app = new App()
+  const stack = new ReactSpaStack(app, "TestStack", domain, source, STACK_ENV)
+  return Template.fromStack(stack)
+}
 
-  const stack = new ReactSpaStack(
-    app,
-    "MyTestStack",
-    "test.ruchij.com",
-    {
-      bucketName: "test-bucket",
-      zipObjectKey: "test-key.zip"
-    },
-    {
-      env: { account: "123456789012", region: "us-east-1" }
-    }
-  )
+describe("ReactSpaStack validation", () => {
+  test("rejects domain that does not end with ruchij.com", () => {
+    expect(() => buildStack("foo.example.com")).toThrow(
+      /Domain must end with ruchij\.com/
+    )
+  })
 
-  const template = Template.fromStack(stack)
+  test("accepts the parent domain itself", () => {
+    expect(() => buildStack("ruchij.com")).not.toThrow()
+  })
 
-  template.hasResourceProperties("AWS::S3::Bucket", {
-    BucketName: "test.ruchij.com"
+  test("accepts deeply-nested subdomains", () => {
+    expect(() => buildStack("a.b.c.ruchij.com")).not.toThrow()
+  })
+
+  test("rejects source object key that is not a .zip", () => {
+    expect(() =>
+      buildStack(VALID_DOMAIN, { bucketName: "b", zipObjectKey: "client.tar.gz" })
+    ).toThrow(/Source object key must end with \.zip/)
+  })
+
+  test("rejects source object key with no extension", () => {
+    expect(() =>
+      buildStack(VALID_DOMAIN, { bucketName: "b", zipObjectKey: "client" })
+    ).toThrow(/Source object key must end with \.zip/)
+  })
+})
+
+describe("ReactSpaStack S3 bucket", () => {
+  test("creates a private bucket named after the domain", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::S3::Bucket", {
+      BucketName: VALID_DOMAIN,
+      AccessControl: "Private"
+    })
+  })
+
+  test("configures DELETE removal policy and auto-delete", () => {
+    const template = buildStack()
+
+    template.hasResource("AWS::S3::Bucket", {
+      DeletionPolicy: "Delete",
+      UpdateReplacePolicy: "Delete",
+      Properties: Match.objectLike({
+        Tags: Match.arrayWith([
+          Match.objectLike({ Key: "aws-cdk:auto-delete-objects", Value: "true" })
+        ])
+      })
+    })
+  })
+})
+
+describe("ReactSpaStack CloudFront", () => {
+  test("creates an Origin Access Identity", () => {
+    const template = buildStack()
+    template.resourceCountIs("AWS::CloudFront::CloudFrontOriginAccessIdentity", 1)
+  })
+
+  test("creates a distribution that redirects HTTP to HTTPS and serves index.html", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        Aliases: [VALID_DOMAIN],
+        DefaultRootObject: "index.html",
+        DefaultCacheBehavior: Match.objectLike({
+          ViewerProtocolPolicy: "redirect-to-https"
+        })
+      })
+    })
+  })
+
+  test("rewrites 404 responses to 200 /index.html with a 5-minute TTL", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        CustomErrorResponses: [
+          {
+            ErrorCode: 404,
+            ResponseCode: 200,
+            ResponsePagePath: "/index.html",
+            ErrorCachingMinTTL: 300
+          }
+        ]
+      })
+    })
+  })
+})
+
+describe("ReactSpaStack certificate and DNS", () => {
+  test("requests an ACM certificate with DNS validation for the domain", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::CertificateManager::Certificate", {
+      DomainName: VALID_DOMAIN,
+      ValidationMethod: "DNS"
+    })
+  })
+
+  test("creates an A alias record pointing at the distribution", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::Route53::RecordSet", {
+      Type: "A",
+      Name: `${VALID_DOMAIN}.`,
+      AliasTarget: Match.objectLike({
+        DNSName: Match.anyValue()
+      })
+    })
+  })
+})
+
+describe("ReactSpaStack deployment", () => {
+  test("creates a single bucket-deployment custom resource", () => {
+    const template = buildStack()
+    template.resourceCountIs("Custom::CDKBucketDeployment", 1)
+  })
+
+  test("invalidates all paths on the distribution", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("Custom::CDKBucketDeployment", {
+      DistributionPaths: ["/*"]
+    })
+  })
+})
+
+describe("ReactSpaStack outputs", () => {
+  test("exposes a DomainName output", () => {
+    const template = buildStack()
+
+    template.hasOutput("DomainName", {
+      Description: "The domain name for the frontend application"
+    })
   })
 })
