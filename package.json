@@ -1,0 +1,40 @@
+{
+  "name": "react-app-cdk-deploy",
+  "version": "1.0.0",
+  "description": "Shared CDK construct + deploy helper for React SPAs hosted under ruchij.com (CloudFront + S3 + ACM + Route53).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "tsconfig.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "prepare": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ruchira088/react-app-cdk-deploy.git"
+  },
+  "license": "UNLICENSED",
+  "private": false,
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.232.1",
+    "constructs": "^10.0.0"
+  },
+  "dependencies": {
+    "simple-git": "^3.30.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.1",
+    "aws-cdk-lib": "^2.232.1",
+    "constructs": "^10.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "~6.0.3"
+  }
+}
