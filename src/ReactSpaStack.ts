@@ -73,7 +73,11 @@ export class ReactSpaStack extends Stack {
       sources: [Source.bucket(sourceBucket, source.zipObjectKey)],
       destinationBucket: s3Bucket,
       distribution: cloudfrontDistribution,
-      distributionPaths: ["/*"]
+      distributionPaths: ["/*"],
+      // The deployment Lambda runs `aws s3 sync`; the default 128 MB starves it
+      // of CPU/network and makes uploads crawl. Give it room so deploys finish
+      // in seconds rather than ~90s.
+      memoryLimit: 1024
     })
 
     const aliasRecord = new ARecord(this, "AliasRecord", {

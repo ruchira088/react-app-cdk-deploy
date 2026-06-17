@@ -145,6 +145,14 @@ describe("ReactSpaStack deployment", () => {
       DistributionPaths: ["/*"]
     })
   })
+
+  test("runs the deployment lambda with raised memory", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      MemorySize: 1024
+    })
+  })
 })
 
 describe("ReactSpaStack outputs", () => {
