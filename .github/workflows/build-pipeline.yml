@@ -32,3 +32,66 @@ jobs:
 
       - name: Test
         run: npm test
+
+  release:
+    name: Release
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          MAJOR_MINOR=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
+          MAJOR=$(echo "$MAJOR_MINOR" | cut -d. -f1)
+
+          git fetch --tags --force
+          LATEST_PATCH=$(git tag -l "v${MAJOR_MINOR}.*" | sed "s/^v${MAJOR_MINOR}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1)
+          if [ -z "$LATEST_PATCH" ]; then
+            NEXT_PATCH=0
+          else
+            NEXT_PATCH=$((LATEST_PATCH + 1))
+          fi
+
+          BARE="${MAJOR_MINOR}.${NEXT_PATCH}"
+          echo "version=v$BARE" >> "$GITHUB_OUTPUT"
+          echo "bare=$BARE" >> "$GITHUB_OUTPUT"
+          echo "major=v$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "Next release: v$BARE (major alias: v$MAJOR)"
+
+      - name: Create release and move major alias
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BARE="${{ steps.version.outputs.bare }}"
+          MAJOR="${{ steps.version.outputs.major }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Bump package.json (+ lockfile) to the new version and commit back to main
+          npm version "$BARE" --no-git-tag-version
+          git add package.json package-lock.json
+          git commit -m "Release $VERSION [skip ci]"
+          git push origin HEAD:main
+
+          # Immutable release tag for this patch (e.g. v1.0.3), pointing at the bump commit
+          git tag "$VERSION"
+          git push origin "refs/tags/$VERSION"
+
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes
+
+          # Move the major alias tag (e.g. v1) to the latest release
+          git tag -f "$MAJOR"
+          git push origin "refs/tags/$MAJOR" --force

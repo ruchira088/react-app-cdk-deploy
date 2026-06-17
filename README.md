@@ -11,10 +11,12 @@ In your React app's `cdk-deploy/package.json`:
 ```json
 {
   "dependencies": {
-    "react-app-cdk-deploy": "github:ruchira088/react-app-cdk-deploy#v1.0.0"
+    "react-app-cdk-deploy": "github:ruchira088/react-app-cdk-deploy#v1"
   }
 }
 ```
+
+Pin to the moving major alias (`#v1`) to always pick up the latest `v1.0.x` release, or pin to an exact tag (e.g. `#v1.0.3`) for a reproducible build.
 
 In your `cdk-deploy/bin/cdk-deploy.ts`:
 
@@ -42,9 +44,14 @@ Region is fixed at `us-east-1` (CloudFront ACM requirement). AWS account comes f
 
 ## Releasing
 
-1. Edit, commit on `main`.
-2. `git tag vX.Y.Z && git push --tags`.
-3. Bump consumer repos: `npm install react-app-cdk-deploy@github:ruchira088/react-app-cdk-deploy#vX.Y.Z`.
+Releases are cut automatically by the GitHub Actions pipeline (`.github/workflows/build-pipeline.yml`). Every push to `main` that passes build + test:
+
+1. Computes the next patch under the `major.minor` in `package.json` (e.g. `1.0` → `v1.0.0`, `v1.0.1`, …) by inspecting existing tags.
+2. Bumps the `version` in `package.json` (+ lockfile) to the new value and commits it back to `main` with a `[skip ci]` message (so the bump commit doesn't retrigger the pipeline).
+3. Creates the immutable release tag (`v1.0.x`) on that bump commit and a GitHub release with auto-generated notes.
+4. Force-moves the major alias tag (`v1`) to point at that newest release, so `#v1` consumers track the latest.
+
+To start a new minor or major line, bump the `version` in `package.json` (e.g. to `1.1.0` or `2.0.0`) and push to `main`; the next release will continue from there.
 
 ## Lower-level API
 
