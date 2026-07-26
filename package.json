@@ -1,6 +1,6 @@
 {
   "name": "react-app-cdk-deploy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Shared CDK construct + deploy helper for React SPAs hosted under ruchij.com (CloudFront + S3 + ACM + Route53).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
