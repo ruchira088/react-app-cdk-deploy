@@ -1,6 +1,6 @@
 {
   "name": "react-app-cdk-deploy",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Shared CDK construct + deploy helper for React SPAs hosted under ruchij.com (CloudFront + S3 + ACM + Route53).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,6 +15,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "test": "npm run typecheck && jest",
     "prepare": "npm run build"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "repository": {
     "type": "git",

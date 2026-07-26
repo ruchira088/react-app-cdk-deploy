@@ -31,6 +31,9 @@ beforeEach(() => {
   process.env = { ...ORIGINAL_ENV }
   delete process.env.ENVIRONMENT
   delete process.env.CDK_DEFAULT_ACCOUNT
+  // Set by GitHub Actions; left in place it would outrank the mocked git
+  // branch and quietly change what these tests exercise on CI.
+  delete process.env.GITHUB_REF_NAME
   mockRevparse.mockResolvedValue("abc1234")
 })
 
@@ -55,7 +58,8 @@ describe("deployReactSpa — main branch", () => {
       zipObjectKey: "main/abc1234/client.zip"
     })
     expect(props).toEqual({
-      env: { account: "999999999999", region: "us-east-1" }
+      env: { account: "999999999999", region: "us-east-1" },
+      retainContent: true
     })
   })
 
@@ -151,6 +155,128 @@ describe("deployReactSpa — env propagation", () => {
     const [, , , , props] = ReactSpaStackMock.mock.calls[0]
     expect(props.env.account).toBeUndefined()
     expect(props.env.region).toBe("us-east-1")
+  })
+})
+
+describe("deployReactSpa — branch name sanitization", () => {
+  test("converts slashes in a branch name into hyphens", async () => {
+    mockBranch.mockResolvedValue({ current: "feature/login-page" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, stackId, domain] = ReactSpaStackMock.mock.calls[0]
+    expect(stackId).toBe("MyStack-feature-login-page")
+    expect(domain).toBe("feature-login-page.ruchij.com")
+  })
+
+  test("lowercases branch names, since bucket names cannot contain uppercase", async () => {
+    mockBranch.mockResolvedValue({ current: "Feature/JIRA-123" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, stackId, domain] = ReactSpaStackMock.mock.calls[0]
+    expect(stackId).toBe("MyStack-feature-jira-123")
+    expect(domain).toBe("feature-jira-123.ruchij.com")
+  })
+
+  test("keeps the raw branch name in the artifact key, which must match the upload", async () => {
+    mockBranch.mockResolvedValue({ current: "feature/login-page" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, , , source] = ReactSpaStackMock.mock.calls[0]
+    expect(source.zipObjectKey).toBe("feature/login-page/abc1234/client.zip")
+  })
+
+  test("keeps the resulting bucket name within the S3 63-character limit", async () => {
+    mockBranch.mockResolvedValue({
+      current: "feature/an-extremely-long-branch-name-that-would-overflow-the-limit"
+    })
+
+    await deployReactSpa(baseConfig)
+
+    const [, , domain] = ReactSpaStackMock.mock.calls[0]
+    expect(domain.length).toBeLessThanOrEqual(63)
+    expect(domain.endsWith(".ruchij.com")).toBe(true)
+  })
+})
+
+describe("deployReactSpa — branch resolution", () => {
+  test("prefers an explicit branch from the config over git", async () => {
+    mockBranch.mockResolvedValue({ current: "main" })
+
+    await deployReactSpa({ ...baseConfig, branch: "override-branch" })
+
+    const [, stackId] = ReactSpaStackMock.mock.calls[0]
+    expect(stackId).toBe("MyStack-override-branch")
+    expect(mockBranch).not.toHaveBeenCalled()
+  })
+
+  test("falls back to GITHUB_REF_NAME when git reports a detached HEAD", async () => {
+    process.env.GITHUB_REF_NAME = "ci-branch"
+    mockBranch.mockResolvedValue({ current: "HEAD" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, stackId] = ReactSpaStackMock.mock.calls[0]
+    expect(stackId).toBe("MyStack-ci-branch")
+  })
+
+  test("prefers an explicit config branch over GITHUB_REF_NAME", async () => {
+    process.env.GITHUB_REF_NAME = "ci-branch"
+    mockBranch.mockResolvedValue({ current: "main" })
+
+    await deployReactSpa({ ...baseConfig, branch: "override-branch" })
+
+    const [, stackId] = ReactSpaStackMock.mock.calls[0]
+    expect(stackId).toBe("MyStack-override-branch")
+  })
+
+  test("throws on a detached HEAD with no fallback available", async () => {
+    mockBranch.mockResolvedValue({ current: "HEAD" })
+
+    await expect(deployReactSpa(baseConfig)).rejects.toThrow(
+      /Unable to determine the current git branch/
+    )
+    expect(ReactSpaStackMock).not.toHaveBeenCalled()
+  })
+
+  test("throws when git reports an empty branch name", async () => {
+    mockBranch.mockResolvedValue({ current: "" })
+
+    await expect(deployReactSpa(baseConfig)).rejects.toThrow(
+      /Unable to determine the current git branch/
+    )
+  })
+})
+
+describe("deployReactSpa — content retention", () => {
+  test("retains content on a production deploy", async () => {
+    process.env.ENVIRONMENT = "production"
+    mockBranch.mockResolvedValue({ current: "main" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, , , , props] = ReactSpaStackMock.mock.calls[0]
+    expect(props.retainContent).toBe(true)
+  })
+
+  test("does not retain content on staging", async () => {
+    mockBranch.mockResolvedValue({ current: "main" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, , , , props] = ReactSpaStackMock.mock.calls[0]
+    expect(props.retainContent).toBe(false)
+  })
+
+  test("does not retain content on a feature branch", async () => {
+    mockBranch.mockResolvedValue({ current: "feature-x" })
+
+    await deployReactSpa(baseConfig)
+
+    const [, , , , props] = ReactSpaStackMock.mock.calls[0]
+    expect(props.retainContent).toBe(false)
   })
 })
 

@@ -2,7 +2,7 @@
 
 Shared AWS CDK construct + deploy helper for React SPAs hosted under `ruchij.com`.
 
-Provisions: S3 bucket → CloudFront (with SPA `404 → /index.html` fallback) → ACM certificate (DNS-validated) → Route53 alias record. Uploads the build artifact from a versioned `.zip` in a separate artifact bucket and invalidates the distribution.
+Provisions: S3 bucket → CloudFront behind an Origin Access Control (with SPA `403/404 → /index.html` fallback) → ACM certificate (DNS-validated) → Route53 alias record. Uploads the build artifact from a versioned `.zip` in a separate artifact bucket and invalidates the distribution.
 
 ## Usage
 
@@ -33,7 +33,7 @@ deployReactSpa({
 
 The helper resolves the current git branch + short commit hash at deploy time, and computes:
 
-- **artifact key**: `${branch}/${commit}/client.zip`
+- **artifact key**: `${branch}/${commit}/client.zip` — uses the *raw* branch name, so it matches whatever your build pipeline uploaded
 - **deployed domain**:
   - `main` + `ENVIRONMENT=production` → `myapp.ruchij.com`
   - `main` + anything else → `staging.myapp.ruchij.com`
@@ -41,6 +41,20 @@ The helper resolves the current git branch + short commit hash at deploy time, a
 - **stack name**: same logic, suffixed with `-${prefix}` for non-prod.
 
 Region is fixed at `us-east-1` (CloudFront ACM requirement). AWS account comes from `CDK_DEFAULT_ACCOUNT`.
+
+### Branch names
+
+Branch names are sanitized before they become a domain, bucket name, or stack id: lowercased, with every run of non-alphanumeric characters collapsed to a single hyphen. So `feature/JIRA-123` deploys to `feature-jira-123.myapp.ruchij.com`. Names too long to fit inside S3's 63-character bucket-name limit are truncated and given a deterministic hash suffix, so a branch keeps the same names across deploys.
+
+If git cannot report a branch — most CI systems check out a detached HEAD — the helper falls back to `GITHUB_REF_NAME`, and then throws with a clear message. You can bypass detection entirely:
+
+```ts
+deployReactSpa({ ..., branch: "my-branch" })
+```
+
+### Content retention
+
+Production deploys (`main` + `ENVIRONMENT=production`) set the site bucket to `RemovalPolicy.RETAIN`, so destroying the stack leaves the content intact. Every prefixed environment — staging and branch deploys — keeps `DESTROY` with auto-delete, so they tear down cleanly. Using the construct directly, this is the `retainContent` prop, defaulting to `false`.
 
 ## Releasing
 

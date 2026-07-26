@@ -36,11 +36,18 @@ CI (`.github/workflows/build-pipeline.yml`) runs exactly `npm ci` → `npm run b
 
 A library, not an app: consumers import it, and their own CDK entrypoint calls into it. Two deliberately separated layers.
 
-**`src/ReactSpaStack.ts`** — a pure CDK `Stack` with no environment or git awareness. Given `(scope, id, domain, {bucketName, zipObjectKey}, props?)` it wires: private S3 bucket (named after the domain) → CloudFront distribution behind an Origin Access Identity → DNS-validated ACM certificate → Route53 A-alias, plus a `BucketDeployment` that unzips the artifact from a *separate, pre-existing* artifact bucket and invalidates `/*`.
+**`src/ReactSpaStack.ts`** — a pure CDK `Stack` with no environment or git awareness. Given `(scope, id, domain, {bucketName, zipObjectKey}, props?)` it wires: private S3 bucket (named after the domain) → CloudFront distribution behind an Origin Access Control → DNS-validated ACM certificate → Route53 A-alias, plus a `BucketDeployment` that unzips the artifact from a *separate, pre-existing* artifact bucket and invalidates `/*`.
 
 Invariants enforced in the constructor and asserted in tests: `domain` must end with `ruchij.com` (the hosted zone is looked up for that parent), and `zipObjectKey` must end with `.zip`.
 
-**`src/deploy.ts`** — the orchestration layer. `deployReactSpa` inspects the working tree via `simple-git` and derives everything the construct needs:
+Two coupled details that look independent but are not:
+
+- **Both 403 and 404 must map to `/index.html`.** OAC's generated bucket policy grants `s3:GetObject` only, so S3 reports a missing key as 403, not 404. Dropping the 403 response breaks every SPA deep link. (Under the previous OAI setup, `grantRead` included `s3:List*`, which is why 404-only worked then.)
+- **`retainContent`** (on `ReactSpaStackProps`) drives *both* `removalPolicy` and `autoDeleteObjects`. `deploy.ts` sets it to `prefix == null`, so production retains and every ephemeral environment tears down.
+
+**`src/naming.ts`** — `sanitizeLabel` reduces a branch name to something valid as a DNS label, S3 bucket name component, and CFN stack id simultaneously. The length budget is computed from the base domain (`63 - domainName.length - 1`) because the bucket is named after the *full* domain, and S3's 63-char bucket limit binds before DNS's per-label limit does. Truncation appends a hash of the original so names stay stable and collision-free across deploys.
+
+**`src/deploy.ts`** — the orchestration layer. `deployReactSpa` resolves the branch (explicit `config.branch` → `GITHUB_REF_NAME` → git, throwing on a detached HEAD) and derives everything the construct needs. Note the raw branch name is kept for the artifact S3 key — it must match what the consumer's pipeline uploaded — while only the *prefix* is sanitized:
 
 | git branch | `ENVIRONMENT` | stack id | domain |
 |---|---|---|---|
@@ -56,7 +63,9 @@ The prefix is `null` for production and is joined into both the stack id (with `
 
 `test/ReactSpaStack.test.ts` synthesises real templates and asserts with `aws-cdk-lib/assertions`. It always passes a concrete `env: { account, region }`; without it `HostedZone.fromLookup` resolves to dummy context values and assertions drift.
 
-`test/deploy.test.ts` mocks `simple-git` and `../src/ReactSpaStack`, then reads `ReactSpaStackMock.mock.calls[0]` positionally — the construct's **argument order is part of what these tests pin**, so reordering the constructor signature breaks them in a way that isn't obvious from the failure message. The `simple-git` mock is a callable factory with `default`/`__esModule` attached because the module is a callable default export.
+`test/deploy.test.ts`'s `beforeEach` deletes `GITHUB_REF_NAME` along with the other env vars. This is load-bearing on CI, not tidiness: GitHub Actions sets it, and branch resolution ranks it above git, so leaving it in place would silently override the mocked branch and make these tests pass locally while asserting the wrong thing on CI.
+
+That suite mocks `simple-git` and `../src/ReactSpaStack`, then reads `ReactSpaStackMock.mock.calls[0]` positionally — the construct's **argument order is part of what these tests pin**, so reordering the constructor signature breaks them in a way that isn't obvious from the failure message. The `simple-git` mock is a callable factory with `default`/`__esModule` attached because the module is a callable default export.
 
 ## Releasing
 
