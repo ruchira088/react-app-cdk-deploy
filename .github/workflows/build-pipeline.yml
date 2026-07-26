@@ -78,13 +78,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Bump package.json (+ lockfile) to the new version and commit back to main
-          npm version "$BARE" --no-git-tag-version
-          git add package.json package-lock.json
-          git commit -m "Release $VERSION [skip ci]"
-          git push origin HEAD:main
+          # Bump package.json (+ lockfile) to the new version and commit back to main.
+          # When a new minor or major line is started by hand, package.json already
+          # holds the target version and the first release of that line has nothing
+          # to bump — `npm version` would fail with "Version not changed".
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" = "$BARE" ]; then
+            echo "package.json is already at $BARE; tagging the current commit"
+          else
+            npm version "$BARE" --no-git-tag-version
+            git add package.json package-lock.json
+            git commit -m "Release $VERSION [skip ci]"
+            git push origin HEAD:main
+          fi
 
-          # Immutable release tag for this patch (e.g. v1.0.3), pointing at the bump commit
+          # Immutable release tag for this patch (e.g. v1.0.3), pointing at the released commit
           git tag "$VERSION"
           git push origin "refs/tags/$VERSION"
 
