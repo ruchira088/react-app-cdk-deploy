@@ -3,6 +3,15 @@ module.exports = {
   roots: ["<rootDir>/test"],
   testMatch: ["**/*.test.ts"],
   transform: {
-    "^.+\\.tsx?$": ["ts-jest", { tsconfig: "tsconfig.test.json" }]
+    "^.+\\.tsx?$": [
+      "@swc/jest",
+      {
+        jsc: {
+          target: "es2022",
+          parser: { syntax: "typescript", decorators: true }
+        },
+        module: { type: "commonjs" }
+      }
+    ]
   }
 }

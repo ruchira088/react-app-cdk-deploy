@@ -12,8 +12,9 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest",
-    "prepare": "tsc"
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "npm run typecheck && jest",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -29,12 +30,18 @@
     "simple-git": "^3.30.0"
   },
   "devDependencies": {
+    "@swc/core": "^1.15.46",
+    "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.10.1",
     "aws-cdk-lib": "^2.232.1",
     "constructs": "^10.0.0",
     "jest": "^30.2.0",
-    "ts-jest": "^29.2.5",
-    "typescript": "~6.0.3"
+    "typescript": "~7.0.2"
+  },
+  "allowScripts": {
+    "@swc/core@1.15.46": true,
+    "fsevents@2.3.3": true,
+    "unrs-resolver@1.12.2": true
   }
 }
