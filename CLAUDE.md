@@ -21,6 +21,29 @@ npx jest -t "feature branches"        # one describe/test by name
 
 CI (`.github/workflows/build-pipeline.yml`) runs exactly `npm ci` → `npm run build` → `npm test`, so those three from a clean tree reproduce it.
 
+## Dependencies
+
+Node engine: `>=20`.
+
+| Kind | Package | Range |
+|---|---|---|
+| peer | `aws-cdk-lib` | `^2.232.1` |
+| peer | `constructs` | `^10.0.0` |
+| runtime | `simple-git` | `^3.30.0` |
+| dev | `typescript` | `~7.0.2` |
+| dev | `@swc/core` | `^1.15.46` |
+| dev | `@swc/jest` | `^0.2.39` |
+| dev | `jest` | `^30.2.0` |
+| dev | `@types/jest` | `^30.0.0` |
+| dev | `@types/node` | `^24.10.1` |
+| dev | `aws-cdk-lib`, `constructs` | mirror the peer ranges |
+
+`aws-cdk-lib` and `constructs` are **peer** dependencies: consumers supply them, and they are duplicated in `devDependencies` only so this repo can build and test. Keep the two copies of each range in sync — a peer range the repo itself doesn't satisfy will pass CI and break consumers.
+
+`simple-git` is the only thing shipped to consumers at runtime. `typescript` is a dev dependency but is still installed on the consumer's machine, because `prepare` compiles `dist/` at install time (see *Releasing*).
+
+**Whenever you change a dependency or its version range, update the dependency table above *and* the `## Requirements` section in `README.md`.** The README states the peer ranges, the Node engine, and the `simple-git`/`typescript` versions to consumers; a bump that lands only in `package.json` leaves both documents lying. Also check the `allowScripts` map (below) if the changed dep has a postinstall.
+
 ## Toolchain constraints
 
 **TypeScript 7 is the native (Go) compiler.** The `typescript` npm package no longer exposes the JavaScript compiler API. Consequences that are easy to trip over:
