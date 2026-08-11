@@ -7,9 +7,9 @@ Provisions: S3 bucket → CloudFront behind an Origin Access Control (with SPA `
 ## Requirements
 
 - **Node.js >= 20**
-- **`aws-cdk-lib` ^2.232.1** and **`constructs` ^10.0.0** — declared as peer dependencies, so your `cdk-deploy` project must install them itself. npm 7+ will auto-install them if they're missing, but pin them explicitly so your CDK CLI and construct library stay on the same version.
+- **`aws-cdk-lib` ^2.264.0** and **`constructs` ^10.0.0** — declared as peer dependencies, so your `cdk-deploy` project must install them itself. npm 7+ will auto-install them if they're missing, but pin them explicitly so your CDK CLI and construct library stay on the same version.
 
-The only runtime dependency this package pulls in is [`simple-git`](https://www.npmjs.com/package/simple-git) (^3.30.0), used to resolve the current branch and commit hash at deploy time.
+The only runtime dependency this package pulls in is [`simple-git`](https://www.npmjs.com/package/simple-git) (^3.36.0), used to resolve the current branch and commit hash at deploy time.
 
 Because consumers install straight from a git tag, the `prepare` script compiles TypeScript on install — so `typescript` (~7.0.2) is fetched as part of the install too.
 
@@ -21,7 +21,7 @@ In your React app's `cdk-deploy/package.json`:
 {
   "dependencies": {
     "react-app-cdk-deploy": "github:ruchira088/react-app-cdk-deploy#v1",
-    "aws-cdk-lib": "^2.232.1",
+    "aws-cdk-lib": "^2.264.0",
     "constructs": "^10.0.0"
   }
 }

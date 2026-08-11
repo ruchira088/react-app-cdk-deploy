@@ -27,13 +27,13 @@ Node engine: `>=20`.
 
 | Kind | Package | Range |
 |---|---|---|
-| peer | `aws-cdk-lib` | `^2.232.1` |
+| peer | `aws-cdk-lib` | `^2.264.0` |
 | peer | `constructs` | `^10.0.0` |
-| runtime | `simple-git` | `^3.30.0` |
+| runtime | `simple-git` | `^3.36.0` |
 | dev | `typescript` | `~7.0.2` |
-| dev | `@swc/core` | `^1.15.46` |
+| dev | `@swc/core` | `^1.15.47` |
 | dev | `@swc/jest` | `^0.2.39` |
-| dev | `jest` | `^30.2.0` |
+| dev | `jest` | `^30.4.2` |
 | dev | `@types/jest` | `^30.0.0` |
 | dev | `@types/node` | `^24.10.1` |
 | dev | `aws-cdk-lib`, `constructs` | mirror the peer ranges |
