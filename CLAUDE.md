@@ -27,11 +27,11 @@ Node engine: `>=20`.
 
 | Kind | Package | Range |
 |---|---|---|
-| peer | `aws-cdk-lib` | `^2.264.0` |
+| peer | `aws-cdk-lib` | `^2.266.0` |
 | peer | `constructs` | `^10.0.0` |
 | runtime | `simple-git` | `^3.36.0` |
 | dev | `typescript` | `~7.0.2` |
-| dev | `@swc/core` | `^1.15.47` |
+| dev | `@swc/core` | `^1.16.1` |
 | dev | `@swc/jest` | `^0.2.39` |
 | dev | `jest` | `^30.4.2` |
 | dev | `@types/jest` | `^30.0.0` |
