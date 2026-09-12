@@ -2,11 +2,11 @@
 
 Shared AWS CDK construct + deploy helper for React SPAs hosted under `ruchij.com`.
 
-Provisions: S3 bucket → CloudFront behind an Origin Access Control (with SPA `403/404 → /index.html` fallback) → ACM certificate (DNS-validated) → Route53 alias record. Uploads the build artifact from a versioned `.zip` in a separate artifact bucket and invalidates the distribution.
+Provisions: S3 bucket → CloudFront behind an Origin Access Control (with SPA `403/404 → /index.html` fallback, HTTP/2 + HTTP/3, and the AWS-managed `SecurityHeadersPolicy`) → ACM certificate (DNS-validated) → Route53 alias record. Uploads the build artifact from a versioned `.zip` in a separate artifact bucket and invalidates the distribution.
 
 ## Requirements
 
-- **Node.js >= 20**
+- **Node.js >= 22**
 - **`aws-cdk-lib` ^2.269.0** and **`constructs` ^10.0.0** — declared as peer dependencies, so your `cdk-deploy` project must install them itself. npm 7+ will auto-install them if they're missing, but pin them explicitly so your CDK CLI and construct library stay on the same version.
 
 The only runtime dependency this package pulls in is [`simple-git`](https://www.npmjs.com/package/simple-git) (^3.36.0), used to resolve the current branch and commit hash at deploy time.
@@ -62,6 +62,10 @@ If git cannot report a branch — most CI systems check out a detached HEAD — 
 ```ts
 deployReactSpa({ ..., branch: "my-branch" })
 ```
+
+### Caching
+
+The artifact is uploaded in two passes. Everything except `index.html` is served with `Cache-Control: max-age=31536000, immutable` — bundle file names are content-hashed, so browsers can keep them indefinitely (note this applies to un-hashed root files like `favicon.ico` too). `index.html` is served with `no-cache`, so browsers revalidate the entrypoint on every load, and it is uploaded *after* everything else so a fresh `index.html` never references a chunk that isn't there yet. The distribution is invalidated (`/*`) once, after both passes.
 
 ### Content retention
 

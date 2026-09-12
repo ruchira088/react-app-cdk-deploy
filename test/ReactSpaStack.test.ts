@@ -152,6 +152,28 @@ describe("ReactSpaStack CloudFront", () => {
     })
   })
 
+  test("serves over HTTP/2 and HTTP/3", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({ HttpVersion: "http2and3" })
+    })
+  })
+
+  test("attaches the AWS-managed SecurityHeadersPolicy to the default behavior", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        DefaultCacheBehavior: Match.objectLike({
+          // Managed policy id for "SecurityHeadersPolicy": HSTS, X-Content-Type-Options,
+          // X-Frame-Options, X-XSS-Protection and Referrer-Policy.
+          ResponseHeadersPolicyId: "67f7725c-6f97-4210-82d7-5512b31e9d03"
+        })
+      })
+    })
+  })
+
   test("rewrites both 403 and 404 responses to 200 /index.html with a 5-minute TTL", () => {
     const template = buildStack()
 
@@ -200,16 +222,65 @@ describe("ReactSpaStack certificate and DNS", () => {
 })
 
 describe("ReactSpaStack deployment", () => {
-  test("creates a single bucket-deployment custom resource", () => {
+  const INDEX_ONLY = { Exclude: ["*"], Include: ["index.html"] }
+  const ASSETS_ONLY = { Exclude: ["index.html"] }
+
+  const findDeployment = (template: Template, props: Record<string, unknown>): string => {
+    const ids = Object.keys(
+      template.findResources("Custom::CDKBucketDeployment", {
+        Properties: Match.objectLike(props)
+      })
+    )
+    expect(ids).toHaveLength(1)
+    return ids[0]
+  }
+
+  test("splits the upload into an assets deployment and an index.html deployment", () => {
     const template = buildStack()
-    template.resourceCountIs("Custom::CDKBucketDeployment", 1)
+
+    template.resourceCountIs("Custom::CDKBucketDeployment", 2)
+    findDeployment(template, ASSETS_ONLY)
+    findDeployment(template, INDEX_ONLY)
   })
 
-  test("invalidates all paths on the distribution", () => {
+  test("uploads index.html with no-cache so browsers always revalidate the entrypoint", () => {
     const template = buildStack()
 
     template.hasResourceProperties("Custom::CDKBucketDeployment", {
+      ...INDEX_ONLY,
+      SystemMetadata: { "cache-control": "no-cache" }
+    })
+  })
+
+  test("uploads everything else as long-lived and immutable, since bundle names are content-hashed", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("Custom::CDKBucketDeployment", {
+      ...ASSETS_ONLY,
+      SystemMetadata: { "cache-control": "max-age=31536000, immutable" }
+    })
+  })
+
+  test("uploads index.html only after the assets it references are in place", () => {
+    const template = buildStack()
+    const assetsDeployment = findDeployment(template, ASSETS_ONLY)
+
+    template.hasResource("Custom::CDKBucketDeployment", {
+      Properties: Match.objectLike(INDEX_ONLY),
+      DependsOn: Match.arrayWith([assetsDeployment])
+    })
+  })
+
+  test("invalidates all paths on the distribution once, from the final deployment", () => {
+    const template = buildStack()
+
+    template.hasResourceProperties("Custom::CDKBucketDeployment", {
+      ...INDEX_ONLY,
       DistributionPaths: ["/*"]
+    })
+    template.hasResourceProperties("Custom::CDKBucketDeployment", {
+      ...ASSETS_ONLY,
+      DistributionId: Match.absent()
     })
   })
 

@@ -1,16 +1,31 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib"
 import { Construct } from "constructs"
 import { BlockPublicAccess, Bucket, BucketAccessControl, IBucket } from "aws-cdk-lib/aws-s3"
-import { Distribution, ViewerProtocolPolicy } from "aws-cdk-lib/aws-cloudfront"
+import {
+  Distribution,
+  HttpVersion,
+  ResponseHeadersPolicy,
+  ViewerProtocolPolicy
+} from "aws-cdk-lib/aws-cloudfront"
 import { ARecord, HostedZone, RecordTarget } from "aws-cdk-lib/aws-route53"
 import { Certificate, CertificateValidation } from "aws-cdk-lib/aws-certificatemanager"
 import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins"
 import { CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets"
-import { BucketDeployment, Source } from "aws-cdk-lib/aws-s3-deployment"
+import { BucketDeployment, CacheControl, Source } from "aws-cdk-lib/aws-s3-deployment"
 
 const PARENT_DOMAIN = "ruchij.com"
 
 const ERROR_RESPONSE_TTL = Duration.minutes(5)
+
+const DEPLOYMENT_MEMORY_LIMIT = 1024
+
+/**
+ * Cache-Control for everything in the artifact except index.html. Bundle file
+ * names are content-hashed, so a browser may keep them indefinitely; a new
+ * build references new names. The trade-off is that un-hashed root files
+ * (favicon.ico, robots.txt, manifest.json) are cached just as long.
+ */
+const ASSET_CACHE_CONTROL = [CacheControl.maxAge(Duration.days(365)), CacheControl.immutable()]
 
 export type SourceS3Resource = {
   readonly bucketName: string
@@ -63,8 +78,10 @@ export class ReactSpaStack extends Stack {
     const cloudfrontDistribution = new Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: S3BucketOrigin.withOriginAccessControl(s3Bucket),
-        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
+        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        responseHeadersPolicy: ResponseHeadersPolicy.SECURITY_HEADERS
       },
+      httpVersion: HttpVersion.HTTP2_AND_3,
       defaultRootObject: "index.html",
       domainNames: [domain],
       certificate,
@@ -88,14 +105,34 @@ export class ReactSpaStack extends Stack {
     })
 
     const sourceBucket: IBucket = Bucket.fromBucketName(this, "SourceBucket", source.bucketName)
+    const sources = [Source.bucket(sourceBucket, source.zipObjectKey)]
 
-    new BucketDeployment(this, "Deploy", {
-      sources: [Source.bucket(sourceBucket, source.zipObjectKey)],
+    // The artifact is uploaded in two passes so that index.html — the one file
+    // whose name never changes — can carry a different Cache-Control from the
+    // hashed bundles it references. Each pass prunes only within its own
+    // include/exclude filters, so the two do not delete each other's files.
+    const assetsDeployment = new BucketDeployment(this, "Deploy", {
+      sources,
       destinationBucket: s3Bucket,
+      exclude: ["index.html"],
+      cacheControl: ASSET_CACHE_CONTROL,
+      memoryLimit: DEPLOYMENT_MEMORY_LIMIT
+    })
+
+    // index.html goes last: a browser that fetches the new entrypoint must find
+    // every chunk it references already in place. Invalidating from here, once,
+    // also guarantees the edge never serves the new index against old assets.
+    const indexDeployment = new BucketDeployment(this, "DeployIndex", {
+      sources,
+      destinationBucket: s3Bucket,
+      exclude: ["*"],
+      include: ["index.html"],
+      cacheControl: [CacheControl.noCache()],
       distribution: cloudfrontDistribution,
       distributionPaths: ["/*"],
-      memoryLimit: 1024
+      memoryLimit: DEPLOYMENT_MEMORY_LIMIT
     })
+    indexDeployment.node.addDependency(assetsDeployment)
 
     const aliasRecord = new ARecord(this, "AliasRecord", {
       recordName: domain,

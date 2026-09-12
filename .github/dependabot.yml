@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # One PR for every dependency bump: the README and CLAUDE.md dependency tables
+    # must be updated alongside package.json (test/docs.test.ts enforces this),
+    # so it is simpler to reconcile them once per week than once per package.
+    groups:
+      npm-dependencies:
+        patterns: ["*"]
+    # Peer ranges are consumer-facing; widening them needs a deliberate decision.
+    ignore:
+      - dependency-name: aws-cdk-lib
+        update-types: ["version-update:semver-major"]
+      - dependency-name: constructs
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

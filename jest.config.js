@@ -8,7 +8,7 @@ module.exports = {
       {
         jsc: {
           target: "es2022",
-          parser: { syntax: "typescript", decorators: true }
+          parser: { syntax: "typescript" }
         },
         module: { type: "commonjs" }
       }

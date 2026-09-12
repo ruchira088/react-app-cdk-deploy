@@ -23,7 +23,7 @@ CI (`.github/workflows/build-pipeline.yml`) runs exactly `npm ci` → `npm run b
 
 ## Dependencies
 
-Node engine: `>=20`.
+Node engine: `>=22`.
 
 | Kind | Package | Range |
 |---|---|---|
@@ -42,7 +42,9 @@ Node engine: `>=20`.
 
 `simple-git` is the only thing shipped to consumers at runtime. `typescript` is a dev dependency but is still installed on the consumer's machine, because `prepare` compiles `dist/` at install time (see *Releasing*).
 
-**Whenever you change a dependency or its version range, update the dependency table above *and* the `## Requirements` section in `README.md`.** The README states the peer ranges, the Node engine, and the `simple-git`/`typescript` versions to consumers; a bump that lands only in `package.json` leaves both documents lying. Also check the `allowScripts` map (below) if the changed dep has a postinstall.
+**Whenever you change a dependency or its version range, update the dependency table above *and* the `## Requirements` section in `README.md`.** The README states the peer ranges, the Node engine, and the `simple-git`/`typescript` versions to consumers; a bump that lands only in `package.json` leaves both documents lying. `test/docs.test.ts` asserts all three agree, so a stale table fails `npm test` — the exact strings it looks for are in that file. Also check the `allowScripts` map (below) if the changed dep has a postinstall.
+
+`AGENTS.md` is a symlink to this file; edit `CLAUDE.md` only.
 
 ## Toolchain constraints
 
@@ -67,6 +69,7 @@ Two coupled details that look independent but are not:
 
 - **Both 403 and 404 must map to `/index.html`.** OAC's generated bucket policy grants `s3:GetObject` only, so S3 reports a missing key as 403, not 404. Dropping the 403 response breaks every SPA deep link. (Under the previous OAI setup, `grantRead` included `s3:List*`, which is why 404-only worked then.)
 - **`retainContent`** (on `ReactSpaStackProps`) drives *both* `removalPolicy` and `autoDeleteObjects`. `deploy.ts` sets it to `prefix == null`, so production retains and every ephemeral environment tears down.
+- **Two `BucketDeployment`s, not one.** `Deploy` uploads everything except `index.html`; `DeployIndex` uploads only `index.html` with `no-cache`, depends on `Deploy`, and is the only one that invalidates the distribution. The order is the point: a browser that fetches a new `index.html` must find every chunk it references already present. Each deployment prunes only within its own include/exclude filters, which is what stops them deleting each other's files.
 
 **`src/naming.ts`** — `sanitizeLabel` reduces a branch name to something valid as a DNS label, S3 bucket name component, and CFN stack id simultaneously. The length budget is computed from the base domain (`63 - domainName.length - 1`) because the bucket is named after the *full* domain, and S3's 63-char bucket limit binds before DNS's per-label limit does. Truncation appends a hash of the original so names stay stable and collision-free across deploys.
 
