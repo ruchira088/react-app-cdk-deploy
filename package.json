@@ -26,25 +26,24 @@
   "license": "UNLICENSED",
   "private": false,
   "peerDependencies": {
-    "aws-cdk-lib": "^2.266.0",
+    "aws-cdk-lib": "^2.269.0",
     "constructs": "^10.0.0"
   },
   "dependencies": {
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
-    "@swc/core": "^1.16.1",
+    "@swc/core": "^1.16.2",
     "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.10.1",
-    "aws-cdk-lib": "^2.266.0",
+    "@types/node": "^24.13.4",
+    "aws-cdk-lib": "^2.269.0",
     "constructs": "^10.0.0",
-    "jest": "^30.4.2",
+    "jest": "^30.5.1",
     "typescript": "~7.0.2"
   },
   "allowScripts": {
-    "fsevents@2.3.3": true,
     "unrs-resolver@1.12.2": true,
-    "@swc/core@1.16.1": true
+    "@swc/core@1.16.2": true
   }
 }

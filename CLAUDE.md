@@ -27,15 +27,15 @@ Node engine: `>=20`.
 
 | Kind | Package | Range |
 |---|---|---|
-| peer | `aws-cdk-lib` | `^2.266.0` |
+| peer | `aws-cdk-lib` | `^2.269.0` |
 | peer | `constructs` | `^10.0.0` |
 | runtime | `simple-git` | `^3.36.0` |
 | dev | `typescript` | `~7.0.2` |
-| dev | `@swc/core` | `^1.16.1` |
+| dev | `@swc/core` | `^1.16.2` |
 | dev | `@swc/jest` | `^0.2.39` |
-| dev | `jest` | `^30.4.2` |
+| dev | `jest` | `^30.5.1` |
 | dev | `@types/jest` | `^30.0.0` |
-| dev | `@types/node` | `^24.10.1` |
+| dev | `@types/node` | `^24.13.4` |
 | dev | `aws-cdk-lib`, `constructs` | mirror the peer ranges |
 
 `aws-cdk-lib` and `constructs` are **peer** dependencies: consumers supply them, and they are duplicated in `devDependencies` only so this repo can build and test. Keep the two copies of each range in sync — a peer range the repo itself doesn't satisfy will pass CI and break consumers.
