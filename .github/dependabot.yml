@@ -10,11 +10,14 @@ updates:
     groups:
       npm-dependencies:
         patterns: ["*"]
-    # Peer ranges are consumer-facing; widening them needs a deliberate decision.
     ignore:
+      # Peer ranges are consumer-facing; widening them needs a deliberate decision.
       - dependency-name: aws-cdk-lib
         update-types: ["version-update:semver-major"]
       - dependency-name: constructs
+        update-types: ["version-update:semver-major"]
+      # The @types/node major tracks the Node line; move it by hand with `engines`.
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
