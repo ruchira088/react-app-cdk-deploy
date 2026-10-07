@@ -6,7 +6,7 @@ jest.mock("simple-git", () => {
     branch: mockBranch,
     revparse: mockRevparse
   })
-  return Object.assign(factory, { default: factory, __esModule: true })
+  return { simpleGit: factory, __esModule: true }
 })
 
 jest.mock("../src/ReactSpaStack", () => ({

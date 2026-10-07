@@ -27,15 +27,15 @@ Node engine: `>=22`.
 
 | Kind | Package | Range |
 |---|---|---|
-| peer | `aws-cdk-lib` | `^2.269.0` |
+| peer | `aws-cdk-lib` | `^2.272.0` |
 | peer | `constructs` | `^10.0.0` |
-| runtime | `simple-git` | `^3.36.0` |
+| runtime | `simple-git` | `^4.0.2` |
 | dev | `typescript` | `~7.0.2` |
-| dev | `@swc/core` | `^1.16.2` |
+| dev | `@swc/core` | `^1.16.13` |
 | dev | `@swc/jest` | `^0.2.39` |
-| dev | `jest` | `^30.5.1` |
+| dev | `jest` | `^30.5.2` |
 | dev | `@types/jest` | `^30.0.0` |
-| dev | `@types/node` | `^24.13.4` |
+| dev | `@types/node` | `^24.19.1` |
 | dev | `aws-cdk-lib`, `constructs` | mirror the peer ranges |
 
 `aws-cdk-lib` and `constructs` are **peer** dependencies: consumers supply them, and they are duplicated in `devDependencies` only so this repo can build and test. Keep the two copies of each range in sync — a peer range the repo itself doesn't satisfy will pass CI and break consumers.
@@ -91,7 +91,7 @@ The prefix is `null` for production and is joined into both the stack id (with `
 
 `test/deploy.test.ts`'s `beforeEach` deletes `GITHUB_REF_NAME` along with the other env vars. This is load-bearing on CI, not tidiness: GitHub Actions sets it, and branch resolution ranks it above git, so leaving it in place would silently override the mocked branch and make these tests pass locally while asserting the wrong thing on CI.
 
-That suite mocks `simple-git` and `../src/ReactSpaStack`, then reads `ReactSpaStackMock.mock.calls[0]` positionally — the construct's **argument order is part of what these tests pin**, so reordering the constructor signature breaks them in a way that isn't obvious from the failure message. The `simple-git` mock is a callable factory with `default`/`__esModule` attached because the module is a callable default export.
+That suite mocks `simple-git` and `../src/ReactSpaStack`, then reads `ReactSpaStackMock.mock.calls[0]` positionally — the construct's **argument order is part of what these tests pin**, so reordering the constructor signature breaks them in a way that isn't obvious from the failure message. The `simple-git` mock exposes the factory as the named `simpleGit` export — simple-git 4 dropped the callable default export that v3 had.
 
 ## Releasing
 

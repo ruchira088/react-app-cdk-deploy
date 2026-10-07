@@ -1,5 +1,5 @@
 import { App } from "aws-cdk-lib/core"
-import SimpleGit from "simple-git"
+import { simpleGit as createGit } from "simple-git"
 import { ReactSpaStack } from "./ReactSpaStack"
 import { MAX_BUCKET_NAME_LENGTH, sanitizeLabel } from "./naming"
 
@@ -39,7 +39,7 @@ const isUsableBranch = (value: string | undefined): value is string =>
  * git the least reliable of the three.
  */
 const resolveBranch = async (
-  simpleGit: ReturnType<typeof SimpleGit>,
+  simpleGit: ReturnType<typeof createGit>,
   override: string | undefined
 ): Promise<string> => {
   if (isUsableBranch(override)) {
@@ -65,7 +65,7 @@ const resolveBranch = async (
 export const deployReactSpa = async (config: DeployReactSpaConfig): Promise<void> => {
   const app = new App()
 
-  const simpleGit = SimpleGit()
+  const simpleGit = createGit()
 
   const branch = await resolveBranch(simpleGit, config.branch)
   const gitCommitHash = await simpleGit.revparse(["--short", "HEAD"])
